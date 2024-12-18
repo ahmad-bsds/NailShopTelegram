@@ -2,6 +2,10 @@ from typing import Final
 from utils import load_env_variable, inference, get_logger
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from keep_alive import keep_alive
+
+
+keep_alive()
 
 logger = get_logger(__name__)
 
