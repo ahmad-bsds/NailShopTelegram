@@ -10,7 +10,6 @@ logger = get_logger(__name__)
 # Load environment variables
 TOKEN: Final = load_env_variable("TELEGRAM_TOKEN")
 BOT_USERNAME: Final = load_env_variable("TELEGRAM_USERNAME")
-PORT = int(load_env_variable("PORT", 8443))
 
 # Telegram Bot Application
 application = Application.builder().token(TOKEN).build()
@@ -90,4 +89,4 @@ if __name__ == "__main__":
     application.bot.set_webhook(WEBHOOK_URL)
 
     # Run Flask app
-    app.run(host="0.0.0.0", port=PORT)
+    app.run(host="0.0.0.0", port=9090)
