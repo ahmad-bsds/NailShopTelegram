@@ -3,28 +3,29 @@ from utils import load_env_variable, inference, get_logger
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 from flask import Flask, request
-
-app = Flask(__name__)
+import logging
 
 logger = get_logger(__name__)
 
+# Load environment variables
 TOKEN: Final = load_env_variable("TELEGRAM_TOKEN")
 BOT_USERNAME: Final = load_env_variable("TELEGRAM_USERNAME")
+PORT = int(load_env_variable("PORT", 8443))
+
+# Telegram Bot Application
+application = Application.builder().token(TOKEN).build()
 
 
+# Define commands
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(f"Hi, I'm Nail Shop Service assistant! How can I help you?")
+    await update.message.reply_text("Hi, I'm Nail Shop Service assistant! How can I help you?")
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        """
-        Welcome! I'm here to help you shine. Need to book an appointment, check our services,\
-        or get quick answers about your nail care? I've got you covered.\
-        From gel polish to acrylics, manicures to pedicures,\
-        just ask and I'll make sure you get the perfect nail experience. Your beauty, our passion! ✨
-        
-        """
+        "Welcome! I'm here to help you shine. Need to book an appointment, check our services, "
+        "or get quick answers about your nail care? I've got you covered.\n"
+        "Your beauty, our passion! ✨"
     )
 
 
@@ -40,28 +41,20 @@ def hande_response(prompt):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Check if someone calling bot in the group then give it response.
-    :param update:
-    :param context:
-    :return: string text
-    """
     message_type = update.message.chat.type
     user_message = update.message.text
 
     logger.info(f"User ({update.message.chat.id}) in {message_type}: {user_message}.")
 
-    if message_type == "group":
-        if BOT_USERNAME in user_message:
-            prompt: str = user_message.replace(f"{BOT_USERNAME} ", "").strip()
-            response: str = hande_response(prompt)
-        else:
-            return
-    else:
+    if message_type == "group" and BOT_USERNAME in user_message:
+        prompt: str = user_message.replace(f"{BOT_USERNAME} ", "").strip()
+        response: str = hande_response(prompt)
+    elif message_type != "group":
         response = hande_response(user_message)
+    else:
+        return
 
     logger.info(f"Response: {response}")
-
     await update.message.reply_text(response)
 
 
@@ -70,48 +63,31 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
 
-logger.info("Starting bot...")
-application = Application.builder().token(TOKEN).build()
-
-# Commands
-start_handler = CommandHandler("start", start)
-help_handler = CommandHandler("help", help_command)
-
-# Messages
-message_handler = MessageHandler(filters.TEXT, handle_message)
-
-# Handlers
-application.add_handler(start_handler)
-application.add_handler(help_handler)
-application.add_handler(message_handler)
-
-# Log Errors
+# Add handlers
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("help", help_command))
+application.add_handler(MessageHandler(filters.TEXT, handle_message))
 application.add_error_handler(error)
 
+# Flask app for webhook
+app = Flask(__name__)
 
-@app.route('/', methods=['POST'])
+
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = Update.de_json(json_string, application.bot)
-        application.process_update(update)
-        return 'ok', 200
-    else:
-        return 'Invalid request', 400
+    """Handle incoming webhook requests from Telegram."""
+    data = request.get_json(force=True)
+    update = Update.de_json(data, application.bot)
+    application.update_queue.put(update)
+    return "OK", 200
 
 
-@app.route('/set_webhook', methods=['GET', 'POST'])
-def set_webhook():
-    webhook_url = f'https://nailshoptelegram.onrender.com'  # Get the Render URL
-    hook = application.bot.set_webhook(webhook_url)
-    if hook:
-        return 'Webhook set!'
-    else:
-        return 'Webhook setup failed.'
+if __name__ == "__main__":
+    logger.info("Starting bot...")
 
+    # Set webhook URL
+    WEBHOOK_URL = f"https://nailshoptelegram.onrender.com/webhook"
+    application.bot.set_webhook(WEBHOOK_URL)
 
-# Run
-logger.info("Pooling...")
-application.run_polling(poll_interval=5)
-
-app.run(debug=True)  # Start Flask app
+    # Run Flask app
+    app.run(host="0.0.0.0", port=PORT)
