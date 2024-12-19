@@ -2,10 +2,9 @@ from typing import Final
 from utils import load_env_variable, inference, get_logger
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-from keep_alive import keep_alive
+from flask import Flask, request
 
-
-keep_alive()
+app = Flask(__name__)
 
 logger = get_logger(__name__)
 
@@ -71,25 +70,48 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
 
-if __name__ == "__main__":
-    logger.info("Starting bot...")
-    application = Application.builder().token(TOKEN).build()
+logger.info("Starting bot...")
+application = Application.builder().token(TOKEN).build()
 
-    # Commands
-    start_handler = CommandHandler("start", start)
-    help_handler = CommandHandler("help", help_command)
+# Commands
+start_handler = CommandHandler("start", start)
+help_handler = CommandHandler("help", help_command)
 
-    # Messages
-    message_handler = MessageHandler(filters.TEXT, handle_message)
+# Messages
+message_handler = MessageHandler(filters.TEXT, handle_message)
 
-    # Handlers
-    application.add_handler(start_handler)
-    application.add_handler(help_handler)
-    application.add_handler(message_handler)
+# Handlers
+application.add_handler(start_handler)
+application.add_handler(help_handler)
+application.add_handler(message_handler)
 
-    # Log Errors
-    application.add_error_handler(error)
+# Log Errors
+application.add_error_handler(error)
 
-    # Run
-    logger.info("Pooling...")
-    application.run_polling(poll_interval=5)
+
+@app.route('/', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = Update.de_json(json_string, application.bot)
+        application.process_update(update)
+        return 'ok', 200
+    else:
+        return 'Invalid request', 400
+
+
+@app.route('/set_webhook', methods=['GET', 'POST'])
+def set_webhook():
+    webhook_url = f'https://nailshoptelegram.onrender.com'  # Get the Render URL
+    hook = application.bot.set_webhook(webhook_url)
+    if hook:
+        return 'Webhook set!'
+    else:
+        return 'Webhook setup failed.'
+
+
+# Run
+logger.info("Pooling...")
+application.run_polling(poll_interval=5)
+
+app.run(debug=True)  # Start Flask app
