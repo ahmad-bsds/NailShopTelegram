@@ -72,13 +72,18 @@ application.add_error_handler(error)
 app = Quart(__name__)
 
 
+@app.route("/", methods=["GET"])
+async def index():
+    return "Hello, World!"
+
+
 @app.route("/webhook", methods=["POST"])
 async def webhook():
     """Handle incoming webhook requests from Telegram."""
     data = await request.get_json(force=True)
     update = Update.de_json(data, application.bot)
     application.update_queue.put(update)
-    return "OK", 200
+    return "Webhook Alive"
 
 
 # Main method to run the app
