@@ -87,7 +87,13 @@ if __name__ == "__main__":
 
     # Set webhook URL
     WEBHOOK_URL = f"https://nailshoptelegram.onrender.com/webhook"
-    application.bot.set_webhook(WEBHOOK_URL)
+
+    try:
+        logger.info(f"Setting webhook to {WEBHOOK_URL}")
+        application.bot.set_webhook(WEBHOOK_URL)
+        logger.info("Webhook set successfully!")
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {e}")
 
     # Run Quart app (ASGI server)
     app.run(host="0.0.0.0", port=9090)
