@@ -2,7 +2,7 @@ from typing import Final
 from utils import load_env_variable, inference, get_logger
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-from flask import Flask, request
+from quart import Quart, request
 import logging
 
 logger = get_logger(__name__)
@@ -68,19 +68,20 @@ application.add_handler(CommandHandler("help", help_command))
 application.add_handler(MessageHandler(filters.TEXT, handle_message))
 application.add_error_handler(error)
 
-# Flask app for webhook
-app = Flask(__name__)
+# Quart app for webhook
+app = Quart(__name__)
 
 
 @app.route("/webhook", methods=["POST"])
-def webhook():
+async def webhook():
     """Handle incoming webhook requests from Telegram."""
-    data = request.get_json(force=True)
+    data = await request.get_json(force=True)
     update = Update.de_json(data, application.bot)
     application.update_queue.put(update)
     return "OK", 200
 
 
+# Main method to run the app
 if __name__ == "__main__":
     logger.info("Starting bot...")
 
@@ -88,5 +89,5 @@ if __name__ == "__main__":
     WEBHOOK_URL = f"https://nailshoptelegram.onrender.com/webhook"
     application.bot.set_webhook(WEBHOOK_URL)
 
-    # Run Flask app
+    # Run Quart app (ASGI server)
     app.run(host="0.0.0.0", port=9090)
